@@ -1133,3 +1133,44 @@ fn readout_shows_the_frame_size_while_drawing_or_resizing() {
     assert_eq!(frame_size([f64::NAN, 0.0, 1.0, 1.0]), None);
     assert_eq!(frame_size([-f64::MAX, 0.0, f64::MAX, 1.0]), None);
 }
+
+/// #9731, #6536: the untouched default frame (the one the tool shows on its own, and again after a
+/// commit) is not a crop in progress, so H, P, O and I stay tool keys, as in Photoshop. Once the
+/// frame is drawn or changed they are the crop's: Show Cropped Area, Classic Mode, the overlay
+/// and Front Image.
+#[test]
+fn tool_keys_leave_the_untouched_frame_but_not_a_pending_crop() {
+    use egui::Key;
+    let fresh = || {
+        let mut app = app(SampleType::U8);
+        app.ui.tool_options.crop_shield.classic_mode = false;
+        ensure_frame(&mut app);
+        assert!(app.crop.default_frame && !pending(&app));
+        app
+    };
+    for (k, tool) in [(Key::H, Tool::Hand), (Key::P, Tool::Pen), (Key::O, Tool::Dodge), (Key::I, Tool::Eyedropper)] {
+        let mut app = fresh();
+        let options = app.ui.tool_options.clone();
+        key(&mut app, k, NONE);
+        assert_eq!(app.ui.tool, tool, "{k:?} selects the tool");
+        assert_eq!(app.ui.tool_options, options, "{k:?} leaves the crop options alone");
+    }
+    // The report's steps: drag an edge, ↵ commits, the tool frames the cropped image again, H.
+    let mut app = fresh();
+    drag(&mut app, &[[200.0, 50.0], [150.0, 50.0]], NONE);
+    assert!(pending(&app));
+    key(&mut app, Key::Enter, NONE);
+    assert_eq!(app.session.active().unwrap().doc.size, Size::new(150, 100), "the crop committed");
+    ensure_frame(&mut app);
+    key(&mut app, Key::H, NONE);
+    assert_eq!(app.ui.tool, Tool::Hand);
+    // A pending crop keeps its keys.
+    let mut app = fresh();
+    drag(&mut app, &[[200.0, 50.0], [150.0, 50.0]], NONE);
+    let shown = app.ui.tool_options.crop_shield.show_cropped_area;
+    key(&mut app, Key::H, NONE);
+    assert_eq!(app.ui.tool, Tool::Crop);
+    assert_ne!(app.ui.tool_options.crop_shield.show_cropped_area, shown, "H toggles Show Cropped Area");
+    key(&mut app, Key::P, NONE);
+    assert_eq!((app.ui.tool, app.ui.tool_options.crop_shield.classic_mode), (Tool::Crop, true), "P toggles Classic Mode");
+}

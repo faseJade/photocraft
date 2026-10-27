@@ -263,10 +263,10 @@ pub fn cycle_orientation(o: &mut ToolOptions) {
     o.crop_overlay_orientation = (o.crop_overlay_orientation % n + 1) % n;
 }
 
-/// O / ⇧O with the Crop tool showing a box and no drag in progress. Returns true when a key was
-/// used; otherwise O stays the Dodge/Burn/Sponge tool key.
+/// O / ⇧O with a crop in progress (not the untouched default frame, #6536) and no drag. Returns
+/// true when a key was used; otherwise O stays the Dodge/Burn/Sponge tool key.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    if app.ui.tool != Tool::Crop || app.ui.crop_rect.is_none() || app.crop.drag.is_some() {
+    if !crate::crop_ui::pending(app) || app.crop.drag.is_some() {
         return false;
     }
     if ctx.input_mut(|i| i.consume_key(Modifiers::SHIFT, Key::O)) {
@@ -495,11 +495,13 @@ mod tests {
         app.ui.tool = Tool::Crop;
         crate::crop_ui::ensure_frame(&mut app);
         assert!(app.ui.crop_rect.is_some());
+        // The keys are a pending crop's, not the untouched default frame's (#6536).
+        app.crop.default_frame = false;
         app
     }
 
     #[test]
-    fn o_cycles_the_overlay_while_the_crop_tool_shows_a_box() {
+    fn o_cycles_the_overlay_during_a_pending_crop() {
         let mut app = crop_app();
         press(&mut app, Modifiers::NONE);
         assert_eq!((app.ui.tool, app.ui.tool_options.crop_overlay), (Tool::Crop, CropOverlay::Grid));

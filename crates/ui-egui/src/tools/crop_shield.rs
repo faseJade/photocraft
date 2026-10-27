@@ -120,11 +120,12 @@ pub fn hides_outside(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && app.ui.crop_rect.is_some() && !app.ui.tool_options.crop_shield.shows_cropped_area()
 }
 
-/// H with the Crop tool showing a box and no drag in progress toggles Show Cropped Area (in
-/// Classic Mode, where the option is greyed out, H is taken and does nothing), and P Use Classic
-/// Mode. Returns true when a key was used; otherwise H stays the Hand tool key and P the Pen's.
+/// H with a crop in progress and no drag toggles Show Cropped Area (in Classic Mode, where the
+/// option is greyed out, H is taken and does nothing), and P Use Classic Mode. The untouched
+/// default frame leaves them alone (#6536, #9731). Returns true when a key was used; otherwise H
+/// stays the Hand tool key and P the Pen's.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    if app.ui.tool != Tool::Crop || app.ui.crop_rect.is_none() || app.crop.drag.is_some() {
+    if !crate::crop_ui::pending(app) || app.crop.drag.is_some() {
         return false;
     }
     if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::H)) {
@@ -305,6 +306,8 @@ mod tests {
         app.ui.tool = Tool::Crop;
         crate::crop_ui::ensure_frame(&mut app);
         assert!(app.ui.crop_rect.is_some());
+        // The keys are a pending crop's, not the untouched default frame's (#6536).
+        app.crop.default_frame = false;
         app
     }
 
@@ -335,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn h_toggles_show_cropped_area_while_the_crop_tool_shows_a_box() {
+    fn h_toggles_show_cropped_area_during_a_pending_crop() {
         let mut app = crop_app();
         assert!(!hides_outside(&app));
         press_h(&mut app);

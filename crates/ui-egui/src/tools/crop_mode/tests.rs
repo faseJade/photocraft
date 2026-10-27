@@ -538,6 +538,8 @@ fn arrows_nudge_the_image_shift_by_ten_and_x_recentres() {
 fn classic_mode_shows_the_cropped_area_and_h_does_nothing() {
     let mut app = app();
     crate::crop_ui::ensure_frame(&mut app);
+    // The keys are a pending crop's, not the untouched default frame's (#6536).
+    app.crop.default_frame = false;
     app.ui.tool_options.crop_shield.show_cropped_area = false;
     assert!(crate::crop_shield::hides_outside(&app));
     app.ui.tool_options.crop_shield.classic_mode = true;
@@ -554,9 +556,11 @@ fn classic_mode_shows_the_cropped_area_and_h_does_nothing() {
 }
 
 #[test]
-fn p_toggles_classic_mode_while_the_crop_tool_shows_a_box() {
+fn p_toggles_classic_mode_during_a_pending_crop() {
     let mut app = app();
     crate::crop_ui::ensure_frame(&mut app);
+    // The keys are a pending crop's, not the untouched default frame's (#6536).
+    app.crop.default_frame = false;
     let press = |app: &mut PhotocraftApp| {
         let ctx = egui::Context::default();
         ctx.input_mut(|i| i.events.push(egui::Event::Key { key: egui::Key::P, physical_key: None, pressed: true, repeat: false, modifiers: NONE }));

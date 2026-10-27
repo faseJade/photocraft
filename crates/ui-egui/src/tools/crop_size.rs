@@ -20,7 +20,7 @@ use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::{Tool, ToolOptions};
+use crate::state::ToolOptions;
 use crate::theme::Tokens;
 
 /// `crop_ratio` key of the W x H x Resolution mode.
@@ -268,10 +268,11 @@ pub fn chosen(app: &mut PhotocraftApp) {
     crate::crop_ui::apply_ratio(app);
 }
 
-/// I with the Crop tool (no text field focused, which the caller checks): Front Image. Returns
-/// true when the key was used; otherwise I stays the Eyedropper tool key.
+/// I with a crop in progress (no text field focused, which the caller checks): Front Image. The
+/// untouched default frame leaves it alone (#6536). Returns true when the key was used; otherwise
+/// I stays the Eyedropper tool key.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    if app.ui.tool != Tool::Crop || app.crop.drag.is_some() || app.session.active().is_none() {
+    if !crate::crop_ui::pending(app) || app.crop.drag.is_some() {
         return false;
     }
     if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, egui::Key::I)) {
@@ -334,6 +335,7 @@ pub fn fields(o: &mut ToolOptions, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::Tool;
     use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 
     #[test]
@@ -496,8 +498,9 @@ mod tests {
     }
 
     #[test]
-    fn i_with_the_crop_tool_is_front_image() {
+    fn i_with_a_pending_crop_is_front_image() {
         let mut app = app(SampleType::U8);
+        app.ui.crop_rect = Some([0.0, 0.0, 40.0, 60.0]);
         let ctx = egui::Context::default();
         ctx.input_mut(|i| i.events.push(egui::Event::Key { key: egui::Key::I, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }));
         assert!(keys(&mut app, &ctx));
